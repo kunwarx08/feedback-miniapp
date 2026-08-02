@@ -4,7 +4,14 @@ import { Auth } from './components/Auth';
 import { FeedbackForm } from './components/FeedbackForm';
 import { FeedbackList } from './components/FeedbackList';
 import { Toast } from './components/Toast';
-import { supabase, fetchFeedback, createFeedback, isSupabaseConfigured } from './services/supabase';
+import {
+  supabase,
+  fetchFeedback,
+  createFeedback,
+  updateFeedback,
+  deleteFeedback,
+  isSupabaseConfigured
+} from './services/supabase';
 import { AlertCircle, Loader2 } from 'lucide-react';
 
 export function App() {
@@ -68,7 +75,7 @@ export function App() {
     }
   }, [user, loadFeedback]);
 
-  // Handle new feedback submission
+  // CREATE Feedback Handler
   const handleSubmitFeedback = async (formData) => {
     setIsSubmitting(true);
     const { error: submitError } = await createFeedback(formData);
@@ -82,13 +89,53 @@ export function App() {
       return false;
     }
 
-    // Success notification
     setToast({
       type: 'success',
       message: 'Feedback submitted successfully!'
     });
 
-    // Refresh feedback list
+    await loadFeedback();
+    return true;
+  };
+
+  // UPDATE Feedback Handler
+  const handleUpdateFeedback = async (id, updatedFields) => {
+    const { error: updateErr } = await updateFeedback(id, updatedFields);
+
+    if (updateErr) {
+      setToast({
+        type: 'error',
+        message: updateErr.message || 'Failed to update feedback.'
+      });
+      return false;
+    }
+
+    setToast({
+      type: 'success',
+      message: 'Feedback updated successfully!'
+    });
+
+    await loadFeedback();
+    return true;
+  };
+
+  // DELETE Feedback Handler
+  const handleDeleteFeedback = async (id) => {
+    const { error: deleteErr } = await deleteFeedback(id);
+
+    if (deleteErr) {
+      setToast({
+        type: 'error',
+        message: deleteErr.message || 'Failed to delete feedback.'
+      });
+      return false;
+    }
+
+    setToast({
+      type: 'success',
+      message: 'Feedback deleted successfully!'
+    });
+
     await loadFeedback();
     return true;
   };
@@ -129,7 +176,7 @@ export function App() {
     );
   }
 
-  // 4. Authenticated State -> Show Main App & Feedback Dashboard
+  // 4. Authenticated State -> Show Main App & Full CRUD Feedback Dashboard
   return (
     <div className="app-container">
       {/* Navigation Header */}
@@ -152,6 +199,8 @@ export function App() {
             isLoading={isLoadingFeedback}
             error={feedbackError}
             onRefresh={loadFeedback}
+            onUpdate={handleUpdateFeedback}
+            onDelete={handleDeleteFeedback}
           />
         </section>
       </main>
@@ -168,7 +217,7 @@ export function App() {
       {/* Footer */}
       <footer className="app-footer">
         <p>
-          Student Feedback Collector &copy; {new Date().getFullYear()} &bull; Auth Enabled with Supabase RLS
+          Student Feedback Collector &copy; {new Date().getFullYear()} &bull; Version 3 (Full CRUD with RLS)
         </p>
       </footer>
     </div>

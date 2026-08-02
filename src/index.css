@@ -1,5 +1,5 @@
 /* ==========================================================================
-   STUDENT FEEDBACK COLLECTOR - MODERN CSS DESIGN SYSTEM (AUTH UPGRADED)
+   STUDENT FEEDBACK COLLECTOR - MODERN CSS DESIGN SYSTEM (VERSION 3 FULL CRUD)
    ========================================================================== */
 
 :root {
@@ -458,7 +458,7 @@ body {
   border-color: var(--primary);
 }
 
-/* Feedback Cards Grid */
+/* Feedback Cards Grid & Actions (V3 CRUD) */
 .feedback-grid {
   display: flex;
   flex-direction: column;
@@ -480,6 +480,56 @@ body {
   transform: translateY(-2px);
   box-shadow: var(--shadow-md);
   border-color: #cbd5e1;
+}
+
+.edit-mode-card {
+  border-color: var(--primary);
+  background: #fafafa;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
+}
+
+.card-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.2rem;
+}
+
+.btn-card-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: none;
+  border: 1px solid #e2e8f0;
+  border-radius: var(--radius-sm);
+  padding: 0.2rem 0.55rem;
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.btn-edit {
+  color: var(--primary);
+  background: var(--primary-light);
+  border-color: #c7d2fe;
+}
+
+.btn-edit:hover {
+  background: #e0e7ff;
+  color: var(--primary-hover);
+}
+
+.btn-delete {
+  color: var(--danger);
+  background: var(--danger-light);
+  border-color: #fecaca;
+}
+
+.btn-delete:hover:not(:disabled) {
+  background: #fee2e2;
+  color: #dc2626;
 }
 
 .card-top {

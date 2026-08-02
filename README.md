@@ -4,6 +4,32 @@ A clean, modern, and production-ready full-stack web application for collecting 
 
 ---
 
+## ⚡ Version 3 (v3-crud) Changelog
+
+### 🚀 New Features Added
+- ✏️ **Edit Feedback**: Users can now edit their existing feedback (Student Name, Course, Star Rating, and Feedback body) directly in an inline form.
+- 🗑️ **Delete Feedback**: Users can delete their own feedback entries with a confirmation prompt.
+- 🛡️ **Full CRUD Row Level Security**: Added PostgreSQL `UPDATE` and `DELETE` RLS policies ensuring users can strictly update and delete **only their own** feedback entries (`auth.uid() = user_id`).
+- 🔔 **Toast Feedback Notifications**: Friendly toast alerts for successful updates, successful deletions, and error messaging.
+
+### 📂 Files Modified
+- `[MODIFY] src/components/FeedbackCard.jsx`: Added inline edit mode, delete confirmation prompt, and Edit/Delete action buttons.
+- `[MODIFY] src/components/FeedbackList.jsx`: Passed `onUpdate` and `onDelete` props down to `FeedbackCard`.
+- `[MODIFY] src/services/supabase.js`: Added `updateFeedback(id, updatedFields)` and `deleteFeedback(id)` methods.
+- `[MODIFY] src/App.jsx`: Connected `handleUpdateFeedback` and `handleDeleteFeedback` functions to Supabase services and toast alerts.
+- `[MODIFY] src/index.css`: Added styles for card action buttons (`btn-edit`, `btn-delete`) and edit mode container.
+- `[MODIFY] supabase/schema.sql`: Added `UPDATE` and `DELETE` Row Level Security policies.
+
+### 🛢️ Database & RLS Policy Changes
+- **No new tables created.** Uses the existing `public.feedback` table.
+- Added `UPDATE` policy: `CREATE POLICY "Users can update own feedback" ON public.feedback FOR UPDATE TO authenticated USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);`
+- Added `DELETE` policy: `CREATE POLICY "Users can delete own feedback" ON public.feedback FOR DELETE TO authenticated USING (auth.uid() = user_id);`
+
+### 🔑 Environment Variables & Deployment
+- **No changes to deployment configuration or environment variables!** Uses the existing `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, GitHub pipeline, and Netlify hosting.
+
+---
+
 ## 📋 Version 2 (v2) Changelog
 
 ### 🚀 New Features Added
@@ -36,7 +62,7 @@ A clean, modern, and production-ready full-stack web application for collecting 
 
 ---
 
-## 🏗️ Architecture Comparison (v1 vs v2)
+## 🏗️ Architecture Comparison (v1 vs v2 vs v3)
 
 ### Diagram Representation
 
@@ -58,40 +84,22 @@ A clean, modern, and production-ready full-stack web application for collecting 
        │
        └─► 2. Supabase PostgreSQL Database (Row Level Security)
               - Foreign Key: user_id ──▶ auth.users(id)
-              - RLS Policy: auth.uid() = user_id
-              - Users ONLY see & submit their own feedback
+              - RLS Policy: auth.uid() = user_id (SELECT, INSERT)
+
+
+[ VERSION 3 ARCHITECTURE (FULL CRUD) ]
+
+  React Frontend (Netlify)
+       │
+       ├─► 1. Supabase Authentication (GoTrue Engine)
+       │      - Email + Password Auth
+       │      - Session Token Storage & Refresh
+       │
+       └─► 2. Supabase PostgreSQL Database (Full CRUD Row Level Security)
+              - Foreign Key: user_id ──▶ auth.users(id)
+              - RLS Policies: auth.uid() = user_id for SELECT, INSERT, UPDATE, & DELETE
+              - Full CRUD operations: Create, Read, Update, Delete
 ```
-
-### Technical Explanation
-
-1. **What Changed**:
-   - In Version 1, the app was a public submission board with no user accounts. Anyone could read or write any feedback.
-   - In Version 2, Supabase GoTrue Auth was integrated into the client layer, and PostgreSQL Row Level Security (RLS) was enabled at the database layer.
-
-2. **Why Authentication Was Introduced**:
-   - To provide data privacy, data ownership, and accountability. Each student can now maintain their personal history of course feedback without public interference.
-
-3. **How User Sessions Work**:
-   - Upon logging in, Supabase issues a JWT (JSON Web Token) session containing the user's `auth.uid()`.
-   - The React client stores this token securely in `localStorage` and listens to state changes via `supabase.auth.onAuthStateChange()`.
-   - When the user refreshes the browser, `supabase.auth.getSession()` automatically restores the active session without forcing the user to log in again.
-
-4. **How Row Level Security Protects Data**:
-   - Every HTTP request to Supabase automatically includes the user's JWT bearer token.
-   - PostgreSQL inspects `auth.uid()` from the token header during SQL query execution.
-   - Because the RLS policy `USING (auth.uid() = user_id)` is enforced at the database kernel level, data isolation is guaranteed even if someone attempts direct API calls outside the React app.
-
----
-
-## 📦 Deployment Perspective Analysis (v1 to v2)
-
-| Dimension | Did it change? | Explanation |
-| :--- | :--- | :--- |
-| **Netlify Deployment** | ❌ **No Change** | Netlify continues to build using `npm run build` and serve from `dist`. The `netlify.toml` file handles SPA routing as before. |
-| **GitHub Workflow** | ❌ **No Change** | Standard `git push origin main` triggers automatic deployment builds via Netlify's webhooks. |
-| **Supabase Configuration** | ✅ **Changed** | Enabled Email Provider under **Authentication -> Providers -> Email** in the Supabase Dashboard. |
-| **SQL Queries Required** | ✅ **Changed** | Executed migration script to add `user_id` column and drop public policies in favor of user-isolated RLS policies. |
-| **Environment Variables** | ❌ **No Change** | `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` provide all necessary access for both Auth and Database services. |
 
 ---
 
@@ -106,27 +114,27 @@ student-feedback-collector/
 ├── .env.example               # Template for required environment variables
 ├── .env                       # Local environment variables (do not commit secrets)
 ├── supabase/
-│   └── schema.sql             # SQL script to create table & RLS policies
+│   └── schema.sql             # SQL script to create table & full CRUD RLS policies
 ├── src/
 │   ├── components/
 │   │   ├── Auth.jsx           # Sign In and Sign Up tabbed form component
 │   │   ├── Navbar.jsx         # App header, user email indicator, & Logout action
 │   │   ├── FeedbackForm.jsx   # Form component for input & validation
-│   │   ├── FeedbackCard.jsx   # Card component to render single feedback item
+│   │   ├── FeedbackCard.jsx   # Card component with inline edit & delete controls
 │   │   ├── FeedbackList.jsx   # Container rendering cards, loading skeletons, & states
 │   │   ├── StarRating.jsx     # Interactive input and read-only star component
 │   │   └── Toast.jsx          # Auto-dismissing success/error toast notification
 │   ├── services/
-│   │   └── supabase.js        # Supabase client initialization & API methods
+│   │   └── supabase.js        # Supabase client initialization & CRUD service methods
 │   ├── index.css              # Custom design system with modern CSS variables
-│   ├── App.jsx                # Main application component & state management
+│   ├── App.jsx                # Main application container & CRUD state handlers
 │   └── main.jsx               # React DOM render entry point
 └── README.md                  # Comprehensive setup and deployment guide
 ```
 
 ---
 
-## 🛢️ Database Schema & RLS Policies
+## 🛢️ Database Schema & Full CRUD RLS Policies
 
 Run the following SQL in your **Supabase Dashboard -> SQL Editor**:
 
@@ -157,22 +165,36 @@ END $$;
 -- 2. Enable Row Level Security (RLS)
 ALTER TABLE public.feedback ENABLE ROW LEVEL SECURITY;
 
--- 3. Drop unauthenticated public policies if present
+-- 3. Drop legacy policies if present
 DROP POLICY IF EXISTS "Allow public read access" ON public.feedback;
 DROP POLICY IF EXISTS "Allow public insert access" ON public.feedback;
+DROP POLICY IF EXISTS "Users can read own feedback" ON public.feedback;
+DROP POLICY IF EXISTS "Users can insert own feedback" ON public.feedback;
+DROP POLICY IF EXISTS "Users can update own feedback" ON public.feedback;
+DROP POLICY IF EXISTS "Users can delete own feedback" ON public.feedback;
 
--- 4. Create user-isolated RLS policies
+-- 4. Create complete user-level RLS policies for full CRUD
+
+-- READ (SELECT)
 CREATE POLICY "Users can read own feedback"
-  ON public.feedback
-  FOR SELECT
-  TO authenticated
+  ON public.feedback FOR SELECT TO authenticated
   USING (auth.uid() = user_id);
 
+-- CREATE (INSERT)
 CREATE POLICY "Users can insert own feedback"
-  ON public.feedback
-  FOR INSERT
-  TO authenticated
+  ON public.feedback FOR INSERT TO authenticated
   WITH CHECK (auth.uid() = user_id);
+
+-- UPDATE
+CREATE POLICY "Users can update own feedback"
+  ON public.feedback FOR UPDATE TO authenticated
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+-- DELETE
+CREATE POLICY "Users can delete own feedback"
+  ON public.feedback FOR DELETE TO authenticated
+  USING (auth.uid() = user_id);
 ```
 
 ---
@@ -214,15 +236,15 @@ VITE_SUPABASE_ANON_KEY=your-actual-anon-key-here
 
 1. Go to **Authentication** -> **Providers** -> **Email**.
 2. Ensure **Email provider** is **Enabled**.
-3. **RECOMMENDED FOR TESTING**: Disable **Confirm Email** (toggle OFF under **Authentication** -> **Providers** -> **Email**). 
-   *Note: Supabase's built-in default email service has a strict rate limit of ~3 confirmation emails per hour. Disabling "Confirm Email" bypasses rate limits and allows instant account creation during development.*
+3. **RECOMMENDED FOR TESTING**: Disable **Confirm Email** (toggle OFF under **Authentication** -> **Providers** -> **Email**).
 
 ### Step 8: Push to GitHub
 
 ```bash
+git checkout -b v3-crud
 git add .
-git commit -m "feat(auth): upgrade app to Version 2 with Supabase Auth & RLS policies"
-git push origin main
+git commit -m "feat(crud): add Edit and Delete feedback functionality with RLS policies"
+git push origin v3-crud
 ```
 
 ### Step 9: Deploy to Netlify
@@ -233,7 +255,7 @@ Import your GitHub repository into Netlify and configure `VITE_SUPABASE_URL` and
 
 1. Open your Netlify live URL.
 2. Sign up with a deliverable email (e.g. `student1@gmail.com` or `student1@university.edu`).
-3. Submit a review and verify user feedback isolation and session persistence.
+3. Submit a review, click **Edit** to modify it, and click **Delete** to test complete CRUD capabilities.
 
 ---
 

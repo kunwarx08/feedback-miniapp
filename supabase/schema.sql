@@ -1,5 +1,5 @@
 -- ==========================================
--- Student Feedback Collector Schema (Auth Upgraded)
+-- Student Feedback Collector Schema (v3-crud Upgraded)
 -- Execute this script in your Supabase SQL Editor
 -- ==========================================
 
@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS public.feedback (
   created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
 );
 
--- If the table already exists from the previous version without user_id, add the column:
+-- Ensure user_id column exists if upgrading from an earlier table version
 DO $$ 
 BEGIN 
   IF NOT EXISTS (
@@ -29,24 +29,41 @@ END $$;
 -- 2. Enable Row Level Security (RLS)
 ALTER TABLE public.feedback ENABLE ROW LEVEL SECURITY;
 
--- 3. Drop legacy public policies if they exist
+-- 3. Drop legacy policies if present
 DROP POLICY IF EXISTS "Allow public read access" ON public.feedback;
 DROP POLICY IF EXISTS "Allow public insert access" ON public.feedback;
 DROP POLICY IF EXISTS "Users can read own feedback" ON public.feedback;
 DROP POLICY IF EXISTS "Users can insert own feedback" ON public.feedback;
+DROP POLICY IF EXISTS "Users can update own feedback" ON public.feedback;
+DROP POLICY IF EXISTS "Users can delete own feedback" ON public.feedback;
 
--- 4. Create strict user-level RLS policies
+-- 4. Create complete user-level RLS policies for full CRUD
 
--- Policy 1: Users can ONLY read feedback that belongs to their auth account
+-- READ (SELECT): Users can ONLY read their own feedback
 CREATE POLICY "Users can read own feedback"
   ON public.feedback
   FOR SELECT
   TO authenticated
   USING (auth.uid() = user_id);
 
--- Policy 2: Users can ONLY insert feedback associated with their own user_id
+-- CREATE (INSERT): Users can ONLY insert feedback associated with their user_id
 CREATE POLICY "Users can insert own feedback"
   ON public.feedback
   FOR INSERT
   TO authenticated
   WITH CHECK (auth.uid() = user_id);
+
+-- UPDATE: Users can ONLY update their own feedback
+CREATE POLICY "Users can update own feedback"
+  ON public.feedback
+  FOR UPDATE
+  TO authenticated
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+-- DELETE: Users can ONLY delete their own feedback
+CREATE POLICY "Users can delete own feedback"
+  ON public.feedback
+  FOR DELETE
+  TO authenticated
+  USING (auth.uid() = user_id);

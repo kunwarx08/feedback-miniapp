@@ -94,11 +94,11 @@ export async function signOutUser() {
 }
 
 /* ==========================================================================
-   DATABASE SERVICE METHODS
+   DATABASE SERVICE METHODS (FULL CRUD)
    ========================================================================== */
 
 /**
- * Fetch feedback for the currently authenticated user.
+ * 1. READ: Fetch feedback for the currently authenticated user.
  * Row Level Security (RLS) automatically filters results to match auth.uid() = user_id.
  */
 export async function fetchFeedback() {
@@ -132,7 +132,7 @@ export async function fetchFeedback() {
 }
 
 /**
- * Insert a new feedback entry associated with the current user.
+ * 2. CREATE: Insert a new feedback entry associated with the current user.
  * @param {Object} feedbackData - { name, course, rating, feedback }
  */
 export async function createFeedback({ name, course, rating, feedback }) {
@@ -176,5 +176,66 @@ export async function createFeedback({ name, course, rating, feedback }) {
   } catch (err) {
     console.error('Unexpected error creating feedback:', err);
     return { data: null, error: err };
+  }
+}
+
+/**
+ * 3. UPDATE: Modify an existing feedback entry owned by the authenticated user.
+ * @param {string} id - UUID of the feedback item to update
+ * @param {Object} updatedFields - { name, course, rating, feedback }
+ */
+export async function updateFeedback(id, { name, course, rating, feedback }) {
+  if (!isSupabaseConfigured || !supabase) {
+    return { data: null, error: new Error('Supabase is not configured.') };
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('feedback')
+      .update({
+        name: name.trim(),
+        course: course.trim(),
+        rating: Number(rating),
+        feedback: feedback.trim()
+      })
+      .eq('id', id)
+      .select();
+
+    if (error) {
+      console.error('Supabase update error:', error);
+      return { data: null, error };
+    }
+
+    return { data, error: null };
+  } catch (err) {
+    console.error('Unexpected error updating feedback:', err);
+    return { data: null, error: err };
+  }
+}
+
+/**
+ * 4. DELETE: Remove a feedback entry owned by the authenticated user.
+ * @param {string} id - UUID of the feedback item to delete
+ */
+export async function deleteFeedback(id) {
+  if (!isSupabaseConfigured || !supabase) {
+    return { error: new Error('Supabase is not configured.') };
+  }
+
+  try {
+    const { error } = await supabase
+      .from('feedback')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Supabase delete error:', error);
+      return { error };
+    }
+
+    return { error: null };
+  } catch (err) {
+    console.error('Unexpected error deleting feedback:', err);
+    return { error: err };
   }
 }

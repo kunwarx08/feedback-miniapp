@@ -3,9 +3,9 @@ import { FeedbackCard } from './FeedbackCard';
 import { RefreshCw, MessageSquare, AlertTriangle, Inbox } from 'lucide-react';
 
 /**
- * FeedbackList component renders all submitted feedback cards, loading skeletons, or empty/error states.
+ * FeedbackList component renders all submitted feedback cards with full CRUD callbacks.
  */
-export function FeedbackList({ feedbackList, isLoading, error, onRefresh }) {
+export function FeedbackList({ feedbackList, isLoading, error, onRefresh, onUpdate, onDelete }) {
   return (
     <div>
       {/* Header with counter and refresh button */}
@@ -69,7 +69,7 @@ export function FeedbackList({ feedbackList, isLoading, error, onRefresh }) {
           <Inbox className="state-icon" />
           <h3>No Feedback Yet</h3>
           <p style={{ fontSize: '0.9rem' }}>
-            Be the first student to submit feedback using the form on the left!
+            Submit feedback using the form on the left to see your reviews here!
           </p>
         </div>
       )}
@@ -78,7 +78,12 @@ export function FeedbackList({ feedbackList, isLoading, error, onRefresh }) {
       {!isLoading && !error && feedbackList.length > 0 && (
         <div className="feedback-grid">
           {feedbackList.map((item) => (
-            <FeedbackCard key={item.id || item.created_at} item={item} />
+            <FeedbackCard
+              key={item.id || item.created_at}
+              item={item}
+              onUpdate={onUpdate}
+              onDelete={onDelete}
+            />
           ))}
         </div>
       )}
