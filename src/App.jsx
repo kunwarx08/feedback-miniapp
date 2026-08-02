@@ -1,42 +1,77 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Navbar } from './components/Navbar';
+import { Auth } from './components/Auth';
 import { FeedbackForm } from './components/FeedbackForm';
 import { FeedbackList } from './components/FeedbackList';
 import { Toast } from './components/Toast';
-import { fetchFeedback, createFeedback, isSupabaseConfigured } from './services/supabase';
-import { GraduationCap, AlertCircle, Sparkles } from 'lucide-react';
+import { supabase, fetchFeedback, createFeedback, isSupabaseConfigured } from './services/supabase';
+import { AlertCircle, Loader2 } from 'lucide-react';
 
 export function App() {
+  const [user, setUser] = useState(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  
   const [feedbackList, setFeedbackList] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingFeedback, setIsLoadingFeedback] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState(null);
+  const [feedbackError, setFeedbackError] = useState(null);
   const [toast, setToast] = useState(null);
 
-  // Fetch all feedback from Supabase
+  // Initialize and listen to Supabase Auth State
+  useEffect(() => {
+    if (!isSupabaseConfigured || !supabase) {
+      setIsAuthLoading(false);
+      return;
+    }
+
+    // 1. Get initial active session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      setIsAuthLoading(false);
+    });
+
+    // 2. Listen for auth changes (login, logout, session refresh)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      setIsAuthLoading(false);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  // Fetch feedback for current authenticated user
   const loadFeedback = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
+    if (!user) return;
 
-    const { data, error: fetchError } = await fetchFeedback();
+    setIsLoadingFeedback(true);
+    setFeedbackError(null);
 
-    if (fetchError) {
-      setError(fetchError);
+    const { data, error } = await fetchFeedback();
+
+    if (error) {
+      setFeedbackError(error);
     } else {
       setFeedbackList(data || []);
     }
 
-    setIsLoading(false);
-  }, []);
+    setIsLoadingFeedback(false);
+  }, [user]);
 
-  // Initial load on component mount
+  // Load feedback whenever authenticated user changes or logs in
   useEffect(() => {
-    loadFeedback();
-  }, [loadFeedback]);
+    if (user) {
+      loadFeedback();
+    } else {
+      setFeedbackList([]);
+    }
+  }, [user, loadFeedback]);
 
-  // Handle form submission
+  // Handle new feedback submission
   const handleSubmitFeedback = async (formData) => {
     setIsSubmitting(true);
-    const { data, error: submitError } = await createFeedback(formData);
+    const { error: submitError } = await createFeedback(formData);
     setIsSubmitting(false);
 
     if (submitError) {
@@ -47,44 +82,61 @@ export function App() {
       return false;
     }
 
-    // Success feedback submission
+    // Success notification
     setToast({
       type: 'success',
-      message: 'Feedback submitted successfully! Thank you.'
+      message: 'Feedback submitted successfully!'
     });
 
-    // Automatically refresh feedback list to include newly created entry
+    // Refresh feedback list
     await loadFeedback();
     return true;
   };
 
-  return (
-    <div className="app-container">
-      {/* Header */}
-      <header className="app-header">
-        <div className="app-badge">
-          <GraduationCap size={16} />
-          Student Portal
-        </div>
-        <h1 className="app-title">Student Feedback Collector</h1>
-        <p className="app-subtitle">
-          Share your course experiences and view real-time student reviews
+  // 1. Show loading spinner while checking auth session on startup
+  if (isAuthLoading) {
+    return (
+      <div className="auth-loading-screen">
+        <Loader2 className="spin-animation" size={36} color="#6366f1" />
+        <p style={{ marginTop: '0.75rem', color: '#64748b', fontWeight: 500 }}>
+          Initializing session...
         </p>
-      </header>
+      </div>
+    );
+  }
 
-      {/* Warning Banner if Supabase Environment Variables are missing */}
-      {!isSupabaseConfigured && (
-        <div className="alert-banner">
-          <AlertCircle size={24} style={{ flexShrink: 0, marginTop: '2px' }} />
+  // 2. Unconfigured Supabase state
+  if (!isSupabaseConfigured) {
+    return (
+      <div className="app-container">
+        <div className="alert-banner" style={{ marginTop: '2rem' }}>
+          <AlertCircle size={24} style={{ flexShrink: 0 }} />
           <div>
-            <strong>Database Not Connected:</strong> You are viewing the app without active Supabase credentials.
-            To connect to your PostgreSQL database, copy <code>.env.example</code> to <code>.env</code> and add your <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code>.
+            <strong>Database Not Connected:</strong> Supabase environment variables are missing.
+            Please configure <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code> in your <code>.env</code> file.
           </div>
         </div>
-      )}
+      </div>
+    );
+  }
+
+  // 3. Unauthenticated State -> Show Auth Screen
+  if (!user) {
+    return (
+      <div className="app-container">
+        <Auth onAuthSuccess={(loggedInUser) => setUser(loggedInUser)} />
+      </div>
+    );
+  }
+
+  // 4. Authenticated State -> Show Main App & Feedback Dashboard
+  return (
+    <div className="app-container">
+      {/* Navigation Header */}
+      <Navbar user={user} onLogout={() => setUser(null)} />
 
       {/* Main Responsive Grid Layout */}
-      <main className="main-layout">
+      <main className="main-layout" style={{ marginTop: '1rem' }}>
         {/* Left Column: Form */}
         <section aria-labelledby="form-heading">
           <FeedbackForm
@@ -97,8 +149,8 @@ export function App() {
         <section aria-labelledby="list-heading">
           <FeedbackList
             feedbackList={feedbackList}
-            isLoading={isLoading}
-            error={error}
+            isLoading={isLoadingFeedback}
+            error={feedbackError}
             onRefresh={loadFeedback}
           />
         </section>
@@ -116,7 +168,7 @@ export function App() {
       {/* Footer */}
       <footer className="app-footer">
         <p>
-          Student Feedback Collector &copy; {new Date().getFullYear()} &bull; Built with React, Vite & Supabase
+          Student Feedback Collector &copy; {new Date().getFullYear()} &bull; Auth Enabled with Supabase RLS
         </p>
       </footer>
     </div>

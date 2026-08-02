@@ -17,15 +17,95 @@ export const supabase = isSupabaseConfigured
   ? createClient(supabaseUrl, supabaseAnonKey)
   : null;
 
+/* ==========================================================================
+   AUTHENTICATION SERVICE METHODS
+   ========================================================================== */
+
 /**
- * Fetch all feedback entries from Supabase, ordered by created_at descending (newest first).
- * @returns {Promise<{ data: Array|null, error: Error|null }>}
+ * Sign up a new user with email and password.
+ * @param {Object} credentials - { email, password }
+ */
+export async function signUpUser({ email, password }) {
+  if (!isSupabaseConfigured || !supabase) {
+    return { data: null, error: new Error('Supabase is not configured.') };
+  }
+
+  try {
+    const { data, error } = await supabase.auth.signUp({
+      email: email.trim(),
+      password: password.trim()
+    });
+
+    if (error) {
+      console.error('Supabase sign up error:', error);
+      return { data: null, error };
+    }
+
+    return { data, error: null };
+  } catch (err) {
+    console.error('Unexpected error during sign up:', err);
+    return { data: null, error: err };
+  }
+}
+
+/**
+ * Sign in an existing user with email and password.
+ * @param {Object} credentials - { email, password }
+ */
+export async function signInUser({ email, password }) {
+  if (!isSupabaseConfigured || !supabase) {
+    return { data: null, error: new Error('Supabase is not configured.') };
+  }
+
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password: password.trim()
+    });
+
+    if (error) {
+      console.error('Supabase sign in error:', error);
+      return { data: null, error };
+    }
+
+    return { data, error: null };
+  } catch (err) {
+    console.error('Unexpected error during sign in:', err);
+    return { data: null, error: err };
+  }
+}
+
+/**
+ * Sign out the currently authenticated user.
+ */
+export async function signOutUser() {
+  if (!isSupabaseConfigured || !supabase) {
+    return { error: new Error('Supabase is not configured.') };
+  }
+
+  try {
+    const { error } = await supabase.auth.signOut();
+    if (error) console.error('Supabase sign out error:', error);
+    return { error };
+  } catch (err) {
+    console.error('Unexpected error during sign out:', err);
+    return { error: err };
+  }
+}
+
+/* ==========================================================================
+   DATABASE SERVICE METHODS
+   ========================================================================== */
+
+/**
+ * Fetch feedback for the currently authenticated user.
+ * Row Level Security (RLS) automatically filters results to match auth.uid() = user_id.
  */
 export async function fetchFeedback() {
   if (!isSupabaseConfigured || !supabase) {
     return {
       data: null,
-      error: new Error('Supabase is not configured. Please set your VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.')
+      error: new Error('Supabase is not configured. Please set your VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env.')
     };
   }
 
@@ -37,7 +117,11 @@ export async function fetchFeedback() {
 
     if (error) {
       console.error('Supabase fetch error:', error);
-      return { data: null, error };
+      let customError = error;
+      if (error.message && error.message.toLowerCase().includes('user_id')) {
+        customError = new Error("Database schema out of date: The 'feedback' table is missing the 'user_id' column. Please run the SQL script from `supabase/schema.sql` in your Supabase SQL Editor.");
+      }
+      return { data: null, error: customError };
     }
 
     return { data, error: null };
@@ -48,9 +132,8 @@ export async function fetchFeedback() {
 }
 
 /**
- * Insert a new feedback record into Supabase.
+ * Insert a new feedback entry associated with the current user.
  * @param {Object} feedbackData - { name, course, rating, feedback }
- * @returns {Promise<{ data: Array|null, error: Error|null }>}
  */
 export async function createFeedback({ name, course, rating, feedback }) {
   if (!isSupabaseConfigured || !supabase) {
@@ -61,10 +144,17 @@ export async function createFeedback({ name, course, rating, feedback }) {
   }
 
   try {
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      return { data: null, error: new Error('You must be logged in to submit feedback.') };
+    }
+
     const { data, error } = await supabase
       .from('feedback')
       .insert([
         {
+          user_id: user.id,
           name: name.trim(),
           course: course.trim(),
           rating: Number(rating),
@@ -75,7 +165,11 @@ export async function createFeedback({ name, course, rating, feedback }) {
 
     if (error) {
       console.error('Supabase insert error:', error);
-      return { data: null, error };
+      let customError = error;
+      if (error.message && error.message.toLowerCase().includes('user_id')) {
+        customError = new Error("Database schema out of date: The 'feedback' table is missing the 'user_id' column. Please run the SQL migration script in your Supabase SQL Editor.");
+      }
+      return { data: null, error: customError };
     }
 
     return { data, error: null };
