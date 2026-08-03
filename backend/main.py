@@ -12,17 +12,13 @@ app = FastAPI(
     version="4.0.0"
 )
 
-# Parse CORS origins from environment variable or default to wildcard/localhost for development
-allowed_origins_env = os.getenv("ALLOWED_ORIGINS", "")
-if allowed_origins_env:
-    origins = [origin.strip() for origin in allowed_origins_env.split(",") if origin.strip()]
-else:
-    origins = ["*"]
-
+# Robust CORS Configuration: Allow all origins (localhost, Netlify, Render)
+# Note: allow_credentials=False is set because authentication uses Authorization Bearer headers (not cookies),
+# which allows browsers to accept wildcard '*' origins without CORS preflight failures.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )

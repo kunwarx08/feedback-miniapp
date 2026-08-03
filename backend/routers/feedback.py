@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List
 from models.schemas import FeedbackCreate, FeedbackUpdate, FeedbackResponse
-from services.supabase_client import supabase, verify_token
+from services.supabase_client import supabase, verify_token, get_authenticated_client
 
 router = APIRouter(prefix="/feedback", tags=["Feedback"])
 
@@ -11,12 +11,11 @@ def get_user_feedback(user=Depends(verify_token)):
     GET /feedback
     Fetch all feedback entries submitted by the currently authenticated user.
     """
-    if not supabase:
-        raise HTTPException(status_code=500, detail="Database connection uninitialized")
+    client = get_authenticated_client(user.jwt_token)
 
     try:
         response = (
-            supabase.from_("feedback")
+            client.from_("feedback")
             .select("*")
             .eq("user_id", user.id)
             .order("created_at", desc=True)
@@ -36,8 +35,7 @@ def create_new_feedback(payload: FeedbackCreate, user=Depends(verify_token)):
     POST /feedback
     Create a new feedback record bound to the authenticated user's ID.
     """
-    if not supabase:
-        raise HTTPException(status_code=500, detail="Database connection uninitialized")
+    client = get_authenticated_client(user.jwt_token)
 
     try:
         data_to_insert = {
@@ -48,7 +46,7 @@ def create_new_feedback(payload: FeedbackCreate, user=Depends(verify_token)):
             "feedback": payload.feedback.strip()
         }
 
-        response = supabase.from_("feedback").insert([data_to_insert]).execute()
+        response = client.from_("feedback").insert([data_to_insert]).execute()
         if not response.data:
             raise HTTPException(status_code=400, detail="Could not create feedback record.")
 
@@ -70,8 +68,7 @@ def update_existing_feedback(
     PUT /feedback/{feedback_id}
     Update an existing feedback entry owned by the authenticated user.
     """
-    if not supabase:
-        raise HTTPException(status_code=500, detail="Database connection uninitialized")
+    client = get_authenticated_client(user.jwt_token)
 
     try:
         update_data = {}
@@ -87,9 +84,8 @@ def update_existing_feedback(
         if not update_data:
             raise HTTPException(status_code=400, detail="No fields provided to update.")
 
-        # Update record matching feedback_id AND user_id
         response = (
-            supabase.from_("feedback")
+            client.from_("feedback")
             .update(update_data)
             .eq("id", feedback_id)
             .eq("user_id", user.id)
@@ -116,12 +112,11 @@ def delete_user_feedback(feedback_id: str, user=Depends(verify_token)):
     DELETE /feedback/{feedback_id}
     Delete a feedback entry owned by the authenticated user.
     """
-    if not supabase:
-        raise HTTPException(status_code=500, detail="Database connection uninitialized")
+    client = get_authenticated_client(user.jwt_token)
 
     try:
         response = (
-            supabase.from_("feedback")
+            client.from_("feedback")
             .delete()
             .eq("id", feedback_id)
             .eq("user_id", user.id)
