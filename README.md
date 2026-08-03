@@ -1,105 +1,93 @@
 # 🎓 Student Feedback Collector
 
-A clean, modern, and production-ready full-stack web application for collecting and viewing student course feedback in real-time. Built with **React**, **Vite**, **Modern CSS**, **Supabase Authentication**, and **PostgreSQL (Row Level Security)**, ready to deploy directly to **Netlify**.
+A clean, modern, and production-ready full-stack web application for collecting and viewing student course feedback in real-time. Built with **React**, **Vite**, **FastAPI (Python)**, **Supabase Authentication**, and **PostgreSQL**, deployed across **Netlify** and **Render**.
 
 ---
 
-## ⚡ Version 3 (v3-crud) Changelog
+## 🏛️ Version 4 (v4-fastapi-backend) Architecture Migration
 
-### 🚀 New Features Added
-- ✏️ **Edit Feedback**: Users can now edit their existing feedback (Student Name, Course, Star Rating, and Feedback body) directly in an inline form.
-- 🗑️ **Delete Feedback**: Users can delete their own feedback entries with a confirmation prompt.
-- 🛡️ **Full CRUD Row Level Security**: Added PostgreSQL `UPDATE` and `DELETE` RLS policies ensuring users can strictly update and delete **only their own** feedback entries (`auth.uid() = user_id`).
-- 🔔 **Toast Feedback Notifications**: Friendly toast alerts for successful updates, successful deletions, and error messaging.
-
-### 📂 Files Modified
-- `[MODIFY] src/components/FeedbackCard.jsx`: Added inline edit mode, delete confirmation prompt, and Edit/Delete action buttons.
-- `[MODIFY] src/components/FeedbackList.jsx`: Passed `onUpdate` and `onDelete` props down to `FeedbackCard`.
-- `[MODIFY] src/services/supabase.js`: Added `updateFeedback(id, updatedFields)` and `deleteFeedback(id)` methods.
-- `[MODIFY] src/App.jsx`: Connected `handleUpdateFeedback` and `handleDeleteFeedback` functions to Supabase services and toast alerts.
-- `[MODIFY] src/index.css`: Added styles for card action buttons (`btn-edit`, `btn-delete`) and edit mode container.
-- `[MODIFY] supabase/schema.sql`: Added `UPDATE` and `DELETE` Row Level Security policies.
-
-### 🛢️ Database & RLS Policy Changes
-- **No new tables created.** Uses the existing `public.feedback` table.
-- Added `UPDATE` policy: `CREATE POLICY "Users can update own feedback" ON public.feedback FOR UPDATE TO authenticated USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);`
-- Added `DELETE` policy: `CREATE POLICY "Users can delete own feedback" ON public.feedback FOR DELETE TO authenticated USING (auth.uid() = user_id);`
-
-### 🔑 Environment Variables & Deployment
-- **No changes to deployment configuration or environment variables!** Uses the existing `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, GitHub pipeline, and Netlify hosting.
+### 🚀 What Changed in Version 4?
+- **3-Tier Architecture Migration**: The React frontend no longer performs direct database CRUD calls to Supabase. Instead, all database operations flow through a dedicated **FastAPI REST API backend** deployed on Render.
+- **FastAPI REST Backend (`backend/`)**: Built a modular Python backend exposing `GET /feedback`, `POST /feedback`, `PUT /feedback/{id}`, and `DELETE /feedback/{id}` endpoints.
+- **JWT Authorization Dependency**: All REST API endpoints extract the `Authorization: Bearer <token>` header from incoming HTTP requests and verify it against Supabase Auth engine before executing database queries.
+- **Supabase Authentication Preserved**: Supabase Auth continues to manage user credentials, login sessions, and JWT token issuance on the frontend.
 
 ---
 
-## 📋 Version 2 (v2) Changelog
-
-### 🚀 New Features Added
-- 🔐 **Supabase Email & Password Authentication**: Full Login, Sign Up, and Sign Out workflow.
-- 🔄 **Persistent Session Management**: User sessions persist automatically across page refreshes (`supabase.auth.getSession()` & `onAuthStateChange`).
-- 🛡️ **User-Isolated Row Level Security (RLS)**: Users can **only read** and **only insert** feedback tied directly to their authenticated account (`auth.uid() = user_id`).
-- 🚦 **Conditional View Routing**: Unauthenticated visitors see only the Auth (Sign In / Sign Up) screen. Authenticated users access the feedback dashboard.
-- 🧭 **Navigation Bar Component**: Displays app logo, current user email badge, and Logout action.
-
-### 📂 Files Modified / Created
-- `[NEW] src/components/Auth.jsx`: Tabbed Sign In and Sign Up form component.
-- `[NEW] src/components/Navbar.jsx`: Top navigation header with user email and Logout action.
-- `[MODIFY] src/App.jsx`: Auth state management, persistent session routing, and conditional view rendering.
-- `[MODIFY] src/services/supabase.js`: Added `signUpUser`, `signInUser`, `signOutUser`, and updated `fetchFeedback`/`createFeedback` to handle `user_id`.
-- `[MODIFY] src/index.css`: Added modern styles for Auth forms, tabs, user badges, navbar, and spinners.
-- `[MODIFY] supabase/schema.sql`: Updated database schema with `user_id` foreign key and strict RLS policies.
-
-### 🛢️ Database Changes
-- Added column `user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE DEFAULT auth.uid()` to `public.feedback` table.
-
-### 🛡️ RLS Policies Added
-- `Users can read own feedback`: `SELECT` policy restricted to `auth.uid() = user_id`.
-- `Users can insert own feedback`: `INSERT` policy restricted to `auth.uid() = user_id`.
-
-### 🔑 Environment Variables
-- **No new environment variables required!** The existing `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` fully support Supabase Auth and RLS.
-
-### ⚠️ Breaking Changes
-- **Database Access Restriction**: Existing anonymous/unauthenticated feedback entries created in v1 without a `user_id` are no longer readable by regular users under strict v2 RLS policies.
-
----
-
-## 🏗️ Architecture Comparison (v1 vs v2 vs v3)
-
-### Diagram Representation
+## 🏗️ Architecture Flow Diagram (v1 ➔ v3 ➔ v4)
 
 ```text
-[ VERSION 1 ARCHITECTURE ]
+[ VERSION 3 ARCHITECTURE (2-TIER DIRECT DB) ]
 
-  React Frontend (Netlify)  ──▶  Supabase Database (Public Access / No Auth)
-                                 - Open SELECT / INSERT policies
-                                 - All feedback visible to anyone
-
-
-[ VERSION 2 ARCHITECTURE ]
-
-  React Frontend (Netlify)
-       │
-       ├─► 1. Supabase Authentication (GoTrue Engine)
-       │      - Email + Password Auth
-       │      - Session Token Storage & Refresh
-       │
-       └─► 2. Supabase PostgreSQL Database (Row Level Security)
-              - Foreign Key: user_id ──▶ auth.users(id)
-              - RLS Policy: auth.uid() = user_id (SELECT, INSERT)
+  React Frontend (Netlify)  ──▶  Supabase Database (PostgreSQL + RLS)
+                                 - Frontend calls database directly
+                                 - Direct Supabase JS Client dependency
 
 
-[ VERSION 3 ARCHITECTURE (FULL CRUD) ]
+[ VERSION 4 ARCHITECTURE (3-TIER PRODUCTION BACKEND) ]
 
   React Frontend (Netlify)
        │
-       ├─► 1. Supabase Authentication (GoTrue Engine)
-       │      - Email + Password Auth
-       │      - Session Token Storage & Refresh
+       ├──► 1. Supabase Auth (Front-End Auth Engine)
+       │       - Logs in user & issues JWT session access token
        │
-       └─► 2. Supabase PostgreSQL Database (Full CRUD Row Level Security)
-              - Foreign Key: user_id ──▶ auth.users(id)
-              - RLS Policies: auth.uid() = user_id for SELECT, INSERT, UPDATE, & DELETE
-              - Full CRUD operations: Create, Read, Update, Delete
+       └──► 2. FastAPI REST API Backend (Render)
+               │    - Validates Authorization: Bearer <jwt_token>
+               │    - Enforces backend business logic & data validation
+               │
+               └──► 3. Supabase PostgreSQL Database
+                       - Executes CRUD queries securely on behalf of user
 ```
+
+---
+
+## 🔒 Security & Environment Variable Breakdown
+
+### Why Use a Dedicated Backend?
+1. **Centralized Business Logic**: Validation, audit logging, rate limiting, and data transformation are handled on the server, preventing client-side tampering.
+2. **Secret Protection**: The **Supabase Service Role Key** grants full administrative privileges to the database. It must **NEVER** be exposed in the frontend JavaScript code. Moving database queries to the backend keeps administrative keys hidden safely on the server.
+
+### Environment Variable Matrix
+
+| Variable Name | Belonging Environment | Description |
+| :--- | :--- | :--- |
+| `VITE_SUPABASE_URL` | **Netlify (Frontend)** | Public URL of your Supabase project used for client authentication. |
+| `VITE_SUPABASE_ANON_KEY` | **Netlify (Frontend)** | Public Anon key for client-side authentication requests. |
+| `VITE_API_URL` | **Netlify (Frontend)** | Public URL of your FastAPI backend hosted on Render. |
+| `SUPABASE_URL` | **Render (Backend)** | Server-side URL connection string for Supabase API. |
+| `SUPABASE_KEY` | **Render (Backend)** | Secret API / Service Role key used by FastAPI server to query database. |
+| `ALLOWED_ORIGINS` | **Render (Backend)** | Comma-separated list of origins allowed by CORS (e.g. your Netlify domain). |
+
+---
+
+## 🌐 FastAPI REST API Endpoints
+
+| HTTP Method | Endpoint | Description | Auth Required |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/` | Root API health status check | ❌ Public |
+| `GET` | `/feedback` | List all feedback belonging to current user | ✅ Bearer JWT |
+| `POST` | `/feedback` | Submit a new feedback record bound to user | ✅ Bearer JWT |
+| `PUT` | `/feedback/{id}` | Update an existing feedback entry owned by user | ✅ Bearer JWT |
+| `DELETE` | `/feedback/{id}` | Delete a feedback entry owned by user | ✅ Bearer JWT |
+
+---
+
+## 🚀 Step-by-Step Render Backend Deployment Guide
+
+1. Log in to [Render](https://render.com) and click **New +** -> **Web Service**.
+2. Connect your GitHub repository (`student-feedback-collector`).
+3. Set the following deployment configuration:
+   - **Name**: `student-feedback-api`
+   - **Root Directory**: `backend`
+   - **Environment**: `Python 3`
+   - **Build Command**: `pip install -r requirements.txt`
+   - **Start Command**: `uvicorn main:app --host 0.0.0.0 --port $PORT`
+4. Add the **Environment Variables** in Render:
+   - `SUPABASE_URL`: `https://your-project-id.supabase.co`
+   - `SUPABASE_KEY`: `your-supabase-service-role-key-or-anon-key`
+   - `ALLOWED_ORIGINS`: `https://your-netlify-app.netlify.app`
+5. Click **Create Web Service**. Once deployed, copy your live Render URL (e.g. `https://student-feedback-api.onrender.com`).
+6. Update Netlify environment variable: Set `VITE_API_URL` to your live Render URL and trigger a redeploy on Netlify!
 
 ---
 
@@ -107,14 +95,25 @@ A clean, modern, and production-ready full-stack web application for collecting 
 
 ```
 student-feedback-collector/
+├── backend/                   # [NEW v4] FastAPI REST Backend
+│   ├── main.py                # FastAPI entry point & CORS configuration
+│   ├── routers/
+│   │   └── feedback.py        # REST API endpoints (GET, POST, PUT, DELETE)
+│   ├── services/
+│   │   └── supabase_client.py # Backend Supabase client & JWT security dependency
+│   ├── models/
+│   │   └── schemas.py         # Pydantic request & response data models
+│   ├── requirements.txt       # Python dependencies (FastAPI, Uvicorn, Supabase)
+│   ├── .env.example           # Backend environment template
+│   └── .env                   # Local backend environment variables
 ├── netlify.toml               # Netlify deployment build settings & SPA redirects
 ├── package.json               # Node.js dependencies and scripts
 ├── vite.config.js             # Vite configuration
 ├── index.html                 # App HTML entry point & Google Fonts
-├── .env.example               # Template for required environment variables
-├── .env                       # Local environment variables (do not commit secrets)
+├── .env.example               # Frontend environment template
+├── .env                       # Frontend local environment variables
 ├── supabase/
-│   └── schema.sql             # SQL script to create table & full CRUD RLS policies
+│   └── schema.sql             # SQL database script & RLS policies
 ├── src/
 │   ├── components/
 │   │   ├── Auth.jsx           # Sign In and Sign Up tabbed form component
@@ -125,145 +124,33 @@ student-feedback-collector/
 │   │   ├── StarRating.jsx     # Interactive input and read-only star component
 │   │   └── Toast.jsx          # Auto-dismissing success/error toast notification
 │   ├── services/
-│   │   └── supabase.js        # Supabase client initialization & CRUD service methods
+│   │   ├── api.js             # [NEW v4] Frontend REST API client for FastAPI
+│   │   └── supabase.js        # Supabase Auth client initialization
 │   ├── index.css              # Custom design system with modern CSS variables
-│   ├── App.jsx                # Main application container & CRUD state handlers
+│   ├── App.jsx                # Main application container & API state handlers
 │   └── main.jsx               # React DOM render entry point
 └── README.md                  # Comprehensive setup and deployment guide
 ```
 
 ---
 
-## 🛢️ Database Schema & Full CRUD RLS Policies
+## 🧪 Local Execution (Frontend + Backend)
 
-Run the following SQL in your **Supabase Dashboard -> SQL Editor**:
+1. **Start FastAPI Backend**:
+   ```bash
+   cd backend
+   pip install -r requirements.txt
+   uvicorn main:app --reload --port 8000
+   ```
+   FastAPI interactive documentation will be available at `http://localhost:8000/docs`.
 
-```sql
--- 1. Create or alter the feedback table with user_id foreign key
-CREATE TABLE IF NOT EXISTS public.feedback (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE DEFAULT auth.uid(),
-  name TEXT NOT NULL,
-  course TEXT NOT NULL,
-  rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
-  feedback TEXT NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
-);
-
--- Ensure user_id column exists if upgrading from an earlier table version
-DO $$ 
-BEGIN 
-  IF NOT EXISTS (
-    SELECT 1 FROM information_schema.columns 
-    WHERE table_schema = 'public' AND table_name = 'feedback' AND column_name = 'user_id'
-  ) THEN
-    ALTER TABLE public.feedback 
-    ADD COLUMN user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE DEFAULT auth.uid();
-  END IF;
-END $$;
-
--- 2. Enable Row Level Security (RLS)
-ALTER TABLE public.feedback ENABLE ROW LEVEL SECURITY;
-
--- 3. Drop legacy policies if present
-DROP POLICY IF EXISTS "Allow public read access" ON public.feedback;
-DROP POLICY IF EXISTS "Allow public insert access" ON public.feedback;
-DROP POLICY IF EXISTS "Users can read own feedback" ON public.feedback;
-DROP POLICY IF EXISTS "Users can insert own feedback" ON public.feedback;
-DROP POLICY IF EXISTS "Users can update own feedback" ON public.feedback;
-DROP POLICY IF EXISTS "Users can delete own feedback" ON public.feedback;
-
--- 4. Create complete user-level RLS policies for full CRUD
-
--- READ (SELECT)
-CREATE POLICY "Users can read own feedback"
-  ON public.feedback FOR SELECT TO authenticated
-  USING (auth.uid() = user_id);
-
--- CREATE (INSERT)
-CREATE POLICY "Users can insert own feedback"
-  ON public.feedback FOR INSERT TO authenticated
-  WITH CHECK (auth.uid() = user_id);
-
--- UPDATE
-CREATE POLICY "Users can update own feedback"
-  ON public.feedback FOR UPDATE TO authenticated
-  USING (auth.uid() = user_id)
-  WITH CHECK (auth.uid() = user_id);
-
--- DELETE
-CREATE POLICY "Users can delete own feedback"
-  ON public.feedback FOR DELETE TO authenticated
-  USING (auth.uid() = user_id);
-```
-
----
-
-## 🛠️ Step-by-Step Setup & Deployment Guide
-
-### Step 1: Install Dependencies
-
-```bash
-npm install
-```
-
-### Step 2: Run Locally
-
-```bash
-npm run dev
-```
-
-### Step 3: Create a Supabase Project
-
-1. Go to [https://supabase.com](https://supabase.com) and create a project.
-
-### Step 4: Create Database Table & RLS Policies
-
-Run the SQL script from `supabase/schema.sql` in the Supabase SQL Editor.
-
-### Step 5: Obtain API Keys
-
-Copy your **Project URL** and **anon public key** from Supabase Settings -> API.
-
-### Step 6: Configure `.env`
-
-```env
-VITE_SUPABASE_URL=https://your-project-id.supabase.co
-VITE_SUPABASE_ANON_KEY=your-actual-anon-key-here
-```
-
-### Step 7: Enable Supabase Email Auth
-
-1. Go to **Authentication** -> **Providers** -> **Email**.
-2. Ensure **Email provider** is **Enabled**.
-3. **RECOMMENDED FOR TESTING**: Disable **Confirm Email** (toggle OFF under **Authentication** -> **Providers** -> **Email**).
-
-### Step 8: Push to GitHub
-
-```bash
-git checkout -b v3-crud
-git add .
-git commit -m "feat(crud): add Edit and Delete feedback functionality with RLS policies"
-git push origin v3-crud
-```
-
-### Step 9: Deploy to Netlify
-
-Import your GitHub repository into Netlify and configure `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in Netlify environment variables.
-
-### Step 10: Verify Deployment
-
-1. Open your Netlify live URL.
-2. Sign up with a deliverable email (e.g. `student1@gmail.com` or `student1@university.edu`).
-3. Submit a review, click **Edit** to modify it, and click **Delete** to test complete CRUD capabilities.
-
----
-
-## 🧰 Tech Stack Summary
-
-- **Frontend**: React (v18), Vite, JavaScript (ES6+), Modern CSS3, Lucide React Icons.
-- **Backend & DB**: Supabase (GoTrue Auth + PostgreSQL database with Row Level Security).
-- **Deployment**: Netlify.
+2. **Start React Frontend**:
+   ```bash
+   # In project root
+   npm install
+   npm run dev
+   ```
+   Open `http://localhost:3000` in your browser.
 
 ---
 

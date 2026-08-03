@@ -4,14 +4,13 @@ import { Auth } from './components/Auth';
 import { FeedbackForm } from './components/FeedbackForm';
 import { FeedbackList } from './components/FeedbackList';
 import { Toast } from './components/Toast';
+import { supabase, isSupabaseConfigured } from './services/supabase';
 import {
-  supabase,
-  fetchFeedback,
-  createFeedback,
-  updateFeedback,
-  deleteFeedback,
-  isSupabaseConfigured
-} from './services/supabase';
+  fetchFeedbackApi,
+  createFeedbackApi,
+  updateFeedbackApi,
+  deleteFeedbackApi
+} from './services/api';
 import { AlertCircle, Loader2 } from 'lucide-react';
 
 export function App() {
@@ -37,7 +36,7 @@ export function App() {
       setIsAuthLoading(false);
     });
 
-    // 2. Listen for auth changes (login, logout, session refresh)
+    // 2. Listen for auth state changes (login, logout, token refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
       setIsAuthLoading(false);
@@ -48,14 +47,14 @@ export function App() {
     };
   }, []);
 
-  // Fetch feedback for current authenticated user
+  // READ: Fetch feedback entries from FastAPI REST backend
   const loadFeedback = useCallback(async () => {
     if (!user) return;
 
     setIsLoadingFeedback(true);
     setFeedbackError(null);
 
-    const { data, error } = await fetchFeedback();
+    const { data, error } = await fetchFeedbackApi();
 
     if (error) {
       setFeedbackError(error);
@@ -66,7 +65,7 @@ export function App() {
     setIsLoadingFeedback(false);
   }, [user]);
 
-  // Load feedback whenever authenticated user changes or logs in
+  // Reload feedback when authenticated user logs in
   useEffect(() => {
     if (user) {
       loadFeedback();
@@ -75,37 +74,37 @@ export function App() {
     }
   }, [user, loadFeedback]);
 
-  // CREATE Feedback Handler
+  // CREATE: Submit feedback via FastAPI REST backend
   const handleSubmitFeedback = async (formData) => {
     setIsSubmitting(true);
-    const { error: submitError } = await createFeedback(formData);
+    const { error: submitError } = await createFeedbackApi(formData);
     setIsSubmitting(false);
 
     if (submitError) {
       setToast({
         type: 'error',
-        message: submitError.message || 'Failed to submit feedback. Please try again.'
+        message: submitError.message || 'Failed to submit feedback via API.'
       });
       return false;
     }
 
     setToast({
       type: 'success',
-      message: 'Feedback submitted successfully!'
+      message: 'Feedback submitted successfully via FastAPI!'
     });
 
     await loadFeedback();
     return true;
   };
 
-  // UPDATE Feedback Handler
+  // UPDATE: Modify feedback via FastAPI REST backend
   const handleUpdateFeedback = async (id, updatedFields) => {
-    const { error: updateErr } = await updateFeedback(id, updatedFields);
+    const { error: updateErr } = await updateFeedbackApi(id, updatedFields);
 
     if (updateErr) {
       setToast({
         type: 'error',
-        message: updateErr.message || 'Failed to update feedback.'
+        message: updateErr.message || 'Failed to update feedback via API.'
       });
       return false;
     }
@@ -119,14 +118,14 @@ export function App() {
     return true;
   };
 
-  // DELETE Feedback Handler
+  // DELETE: Remove feedback via FastAPI REST backend
   const handleDeleteFeedback = async (id) => {
-    const { error: deleteErr } = await deleteFeedback(id);
+    const { error: deleteErr } = await deleteFeedbackApi(id);
 
     if (deleteErr) {
       setToast({
         type: 'error',
-        message: deleteErr.message || 'Failed to delete feedback.'
+        message: deleteErr.message || 'Failed to delete feedback via API.'
       });
       return false;
     }
@@ -176,7 +175,7 @@ export function App() {
     );
   }
 
-  // 4. Authenticated State -> Show Main App & Full CRUD Feedback Dashboard
+  // 4. Authenticated State -> Show Main App & FastAPI REST Feedback Dashboard
   return (
     <div className="app-container">
       {/* Navigation Header */}
@@ -217,7 +216,7 @@ export function App() {
       {/* Footer */}
       <footer className="app-footer">
         <p>
-          Student Feedback Collector &copy; {new Date().getFullYear()} &bull; Version 3 (Full CRUD with RLS)
+          Student Feedback Collector &copy; {new Date().getFullYear()} &bull; Version 4 (FastAPI + Render 3-Tier Architecture)
         </p>
       </footer>
     </div>
