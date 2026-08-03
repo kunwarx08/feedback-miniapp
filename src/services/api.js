@@ -25,15 +25,39 @@ async function getAuthHeaders() {
 }
 
 /**
+ * Helper to fetch API endpoints with fallback prefix support (/feedback or /api/feedback).
+ */
+async function fetchWithFallback(endpointPath, options = {}) {
+  const headers = await getAuthHeaders();
+  const requestOptions = {
+    ...options,
+    headers: {
+      ...headers,
+      ...(options.headers || {})
+    }
+  };
+
+  // 1. Primary Attempt: /feedback
+  let res = await fetch(`${API_BASE_URL}${endpointPath}`, requestOptions);
+  
+  // 2. Fallback Attempt: /api/feedback if primary endpoint returns 404
+  if (res.status === 404 && !endpointPath.startsWith('/api')) {
+    const fallbackPath = `/api${endpointPath}`;
+    const fallbackRes = await fetch(`${API_BASE_URL}${fallbackPath}`, requestOptions);
+    if (fallbackRes.ok) {
+      return fallbackRes;
+    }
+  }
+
+  return res;
+}
+
+/**
  * 1. READ: Fetch feedback entries from FastAPI REST backend.
  */
 export async function fetchFeedbackApi() {
   try {
-    const headers = await getAuthHeaders();
-    const response = await fetch(`${API_BASE_URL}/feedback`, {
-      method: 'GET',
-      headers
-    });
+    const response = await fetchWithFallback('/feedback', { method: 'GET' });
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
@@ -53,10 +77,8 @@ export async function fetchFeedbackApi() {
  */
 export async function createFeedbackApi({ name, course, rating, feedback }) {
   try {
-    const headers = await getAuthHeaders();
-    const response = await fetch(`${API_BASE_URL}/feedback`, {
+    const response = await fetchWithFallback('/feedback', {
       method: 'POST',
-      headers,
       body: JSON.stringify({ name, course, rating: Number(rating), feedback })
     });
 
@@ -78,10 +100,8 @@ export async function createFeedbackApi({ name, course, rating, feedback }) {
  */
 export async function updateFeedbackApi(id, { name, course, rating, feedback }) {
   try {
-    const headers = await getAuthHeaders();
-    const response = await fetch(`${API_BASE_URL}/feedback/${id}`, {
+    const response = await fetchWithFallback(`/feedback/${id}`, {
       method: 'PUT',
-      headers,
       body: JSON.stringify({ name, course, rating: Number(rating), feedback })
     });
 
@@ -103,10 +123,8 @@ export async function updateFeedbackApi(id, { name, course, rating, feedback }) 
  */
 export async function deleteFeedbackApi(id) {
   try {
-    const headers = await getAuthHeaders();
-    const response = await fetch(`${API_BASE_URL}/feedback/${id}`, {
-      method: 'DELETE',
-      headers
+    const response = await fetchWithFallback(`/feedback/${id}`, {
+      method: 'DELETE'
     });
 
     if (!response.ok) {

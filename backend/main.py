@@ -27,8 +27,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Register API Routers
+# Register API Routers under both /feedback and /api/feedback for maximum compatibility
 app.include_router(feedback.router)
+app.include_router(feedback.router, prefix="/api")
 
 @app.get("/")
 def read_root():
@@ -36,6 +37,10 @@ def read_root():
         "status": "online",
         "service": "Student Feedback Collector API",
         "version": "4.0.0",
+        "endpoints": {
+            "feedback": "/feedback",
+            "api_feedback": "/api/feedback"
+        },
         "documentation": "/docs"
     }
 
