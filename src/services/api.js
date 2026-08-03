@@ -37,14 +37,15 @@ async function fetchWithFallback(endpointPath, options = {}) {
     }
   };
 
-  // 1. Primary Attempt: /feedback
+  // 1. Primary Attempt: /feedback or /api/feedback
   let res = await fetch(`${API_BASE_URL}${endpointPath}`, requestOptions);
   
-  // 2. Fallback Attempt: /api/feedback if primary endpoint returns 404
-  if (res.status === 404 && !endpointPath.startsWith('/api')) {
+  // 2. If primary attempt returned 404, try /api prefix if not already present
+  if (res.status === 404 && !endpointPath.startsWith('/api') && !API_BASE_URL.endsWith('/api')) {
     const fallbackPath = `/api${endpointPath}`;
     const fallbackRes = await fetch(`${API_BASE_URL}${fallbackPath}`, requestOptions);
-    if (fallbackRes.ok) {
+    // If fallback is not 404, return fallback response
+    if (fallbackRes.status !== 404) {
       return fallbackRes;
     }
   }
@@ -61,7 +62,7 @@ export async function fetchFeedbackApi() {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || `Server returned status ${response.status}`);
+      throw new Error(errorData.detail || errorData.message || `Server returned status ${response.status}`);
     }
 
     const data = await response.json();
@@ -84,7 +85,7 @@ export async function createFeedbackApi({ name, course, rating, feedback }) {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || `Failed to create feedback (${response.status})`);
+      throw new Error(errorData.detail || errorData.message || `Failed to create feedback (${response.status})`);
     }
 
     const data = await response.json();
@@ -107,7 +108,7 @@ export async function updateFeedbackApi(id, { name, course, rating, feedback }) 
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || `Failed to update feedback (${response.status})`);
+      throw new Error(errorData.detail || errorData.message || `Failed to update feedback (${response.status})`);
     }
 
     const data = await response.json();
@@ -129,7 +130,7 @@ export async function deleteFeedbackApi(id) {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || `Failed to delete feedback (${response.status})`);
+      throw new Error(errorData.detail || errorData.message || `Failed to delete feedback (${response.status})`);
     }
 
     return { error: null };
